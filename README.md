@@ -125,10 +125,9 @@ See `.env.example`. Key vars: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
 `CORS_ALLOW_ORIGINS`, and agent limits (`MAX_SUPERVISOR_STEPS`,
 `MAX_CONTEXT_TOKENS`, `MAX_FETCH_CHARS`).
 
-`DATABASE_URL` is an **async** SQLAlchemy URL. Local Postgres and Neon are
-swappable purely via this env var:
-- local: `postgresql+asyncpg://postgres:postgres@localhost:5432/research`
-- Neon: `postgresql+asyncpg://USER:PASS@ep-xxxx.region.aws.neon.tech/db?ssl=require`
+`DATABASE_URL` is an **async** SQLAlchemy URL pointing at **Neon Postgres**
+(`postgresql+asyncpg://...?ssl=require`). SQLite is not used at runtime; tests
+alone use a temporary SQLite file via fixtures.
 
 ## Failure handling (the 3 required paths)
 

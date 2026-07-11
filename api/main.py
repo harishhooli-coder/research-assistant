@@ -31,6 +31,7 @@ HEARTBEAT_SECONDS = 25
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    get_settings().require_postgres_database()
     # Allow tests / callers to pre-inject a redis pool (e.g. fakeredis).
     if not getattr(app.state, "redis", None):
         app.state.redis = await create_arq_pool()

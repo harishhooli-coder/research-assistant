@@ -72,7 +72,7 @@ try {
 }
 
 $dbUrl = $envVars["DATABASE_URL"]
-if ($dbUrl -match "localhost|sqlite") {
+if ($dbUrl -match "localhost|^\s*$") {
     Write-Host "==> Creating Fly Postgres (skip if cluster already exists)..."
     $pg = & $fly postgres list --json | ConvertFrom-Json
     $pgExists = $pg | Where-Object { $_.Name -eq "research-db" }
@@ -92,7 +92,7 @@ $secretPairs = @(
     "REDIS_URL=redis://research-redis.internal:6379"
 )
 if ($envVars["CORS_ALLOW_ORIGINS"]) { $secretPairs += "CORS_ALLOW_ORIGINS=$($envVars['CORS_ALLOW_ORIGINS'])" }
-if ($envVars["DATABASE_URL"] -and $envVars["DATABASE_URL"] -notmatch "localhost|sqlite") {
+if ($envVars["DATABASE_URL"] -and $envVars["DATABASE_URL"] -notmatch "localhost") {
     $secretPairs += "DATABASE_URL=$($envVars['DATABASE_URL'])"
 }
 

@@ -1,7 +1,7 @@
 """Async engine/session factory.
 
-The connection string comes from ``DATABASE_URL`` (Neon in prod, local
-Postgres or SQLite for dev/tests) so the backend is fully swappable via env.
+The connection string comes from ``DATABASE_URL`` (Neon Postgres in dev/prod;
+tests inject a temporary SQLite URL via ``get_engine(url=...)``).
 """
 
 from __future__ import annotations

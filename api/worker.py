@@ -92,6 +92,7 @@ async def run_research_job(ctx: dict, job_id: str, query: str) -> dict:
 
 
 async def on_startup(ctx: dict) -> None:
+    get_settings().require_postgres_database()
     get_engine()  # warm the async engine / sessionmaker
     missing = get_settings().missing_runtime_keys()
     if missing:

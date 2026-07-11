@@ -47,8 +47,8 @@ class Settings(BaseSettings):
     # --- Redis (arq queue + pub/sub + episodic memory) ---------------------
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
 
-    # --- Database (Neon in prod, local Postgres for dev/tests) -------------
-    # async SQLAlchemy URL, e.g. postgresql+asyncpg://user:pass@host/db
+    # --- Database (Neon Postgres; local docker-compose Postgres optional) ---
+    # async SQLAlchemy URL — must use postgresql+asyncpg:// (not sqlite) at runtime.
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/research",
         alias="DATABASE_URL",
@@ -150,6 +150,19 @@ class Settings(BaseSettings):
             "Anthropic: https://console.anthropic.com/settings/keys, "
             "Tavily: https://tavily.com) — then restart the API and worker."
         )
+
+    def require_postgres_database(self) -> None:
+        url = (self.database_url or "").strip().lower()
+        if url.startswith("sqlite"):
+            raise RuntimeError(
+                "SQLite is no longer supported. Set DATABASE_URL to your Neon "
+                "Postgres URL (postgresql+asyncpg://...?ssl=require) in .env."
+            )
+        if not url.startswith("postgresql"):
+            raise RuntimeError(
+                "DATABASE_URL must be a Postgres async URL "
+                "(postgresql+asyncpg://...)."
+            )
 
 
 @lru_cache
