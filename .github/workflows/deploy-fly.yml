@@ -1,0 +1,50 @@
+name: Deploy backend to Fly.io
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "agent/**"
+      - "api/**"
+      - "db/**"
+      - "memory/**"
+      - "fly/**"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "settings.py"
+      - ".github/workflows/deploy-fly.yml"
+
+jobs:
+  deploy-redis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy Redis
+        working-directory: fly/redis
+        run: fly deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-api:
+    needs: deploy-redis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy API
+        run: fly deploy --config fly/api/fly.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-worker:
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy worker
+        run: fly deploy --config fly/worker/fly.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

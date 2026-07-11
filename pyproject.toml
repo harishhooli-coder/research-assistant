@@ -1,0 +1,17 @@
+[project]
+name = "research-assistant"
+version = "0.1.0"
+description = "2-agent LangGraph research assistant: Telegram bot + FastAPI/arq backend + Redis memory + Neon Postgres"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.setuptools]
+py-modules = ["settings"]
+packages = ["agent", "bot", "memory", "api", "db"]

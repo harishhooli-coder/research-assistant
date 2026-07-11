@@ -1,0 +1,7 @@
+# Playwright e2e — not needed for production builds
+e2e/
+playwright.config.ts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
