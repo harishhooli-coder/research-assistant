@@ -1,0 +1,54 @@
+# Render Blueprint — deploy backend when Fly.io is unavailable.
+# https://render.com/docs/blueprint-spec
+#
+# 1. Push this repo to GitHub
+# 2. Render Dashboard → New → Blueprint → connect repo
+# 3. Set secret env vars in Render (NVIDIA_API_KEY, TAVILY_API_KEY, DATABASE_URL, REDIS_URL)
+#
+# Note: Render Redis is a separate add-on, or use Upstash Redis URL for REDIS_URL.
+
+services:
+  - type: web
+    name: research-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: nvidia
+      - key: NVIDIA_MODEL
+        value: meta/llama-3.3-70b-instruct
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+
+  - type: worker
+    name: research-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: arq api.worker.WorkerSettings
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: nvidia
+      - key: NVIDIA_MODEL
+        value: meta/llama-3.3-70b-instruct
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
