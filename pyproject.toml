@@ -15,3 +15,6 @@ filterwarnings = [
 [tool.setuptools]
 py-modules = ["settings"]
 packages = ["agent", "bot", "memory", "api", "db"]
+
+[tool.vercel]
+entrypoint = "index:app"

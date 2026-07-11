@@ -12,6 +12,7 @@ build/
 .env.local
 .tools/
 data/
+.vercel/
 
 # Node / Next.js (web/)
 web/node_modules/

@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import type { Metadata } from "next";
 import { DM_Sans, Space_Grotesk } from "next/font/google";
 import "./globals.css";
@@ -35,20 +37,22 @@ export default function RootLayout({
       className={`${dmSans.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="page-gradient flex min-h-full flex-col">
-            <SiteHeader />
-            <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
-              {children}
-            </main>
-          </div>
-          <Toaster position="top-center" richColors />
-        </ThemeProvider>
+        <ClerkProvider appearance={{ theme: shadcn }}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <div className="page-gradient flex min-h-full flex-col">
+              <SiteHeader />
+              <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:px-6">
+                {children}
+              </main>
+            </div>
+            <Toaster position="top-center" richColors />
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
