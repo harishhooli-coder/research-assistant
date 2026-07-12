@@ -3,38 +3,27 @@
  *
  * The browser talks ONLY to FastAPI (never a DB directly). The base URL is
  * configured via NEXT_PUBLIC_API_URL (see .env.local.example).
+ *
+ * REST request/response types are generated from docs/api/openapi.json.
+ * Regenerate with: npm run docs:update (from web/) or scripts/update-docs.ps1
  */
 
-export type ResearchStatus = "queued" | "running" | "done" | "failed";
+import type { components } from "./api.generated";
 
-export interface ResearchSource {
-  title: string;
-  url: string;
-}
+type Schemas = components["schemas"];
 
-export interface ResearchResultPayload {
-  markdown: string;
-  sources: ResearchSource[];
-}
+export type ResearchStatus = Schemas["JobSummary"]["status"];
+
+/** Final research payload when status is "done". */
+export type ResearchResultPayload = Schemas["ResearchResultPayload"];
+
+export type ResearchSource = Schemas["ResearchSource"];
 
 /** Summary row used by the history list (GET /research). */
-export interface ResearchSummary {
-  jobId: string;
-  query: string;
-  status: ResearchStatus;
-  createdAt: string;
-}
+export type ResearchSummary = Schemas["JobSummary"];
 
 /** Full job detail (GET /research/{jobId}). */
-export interface ResearchJob {
-  jobId: string;
-  query: string;
-  status: ResearchStatus;
-  result: ResearchResultPayload | null;
-  error: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+export type ResearchJob = Schemas["JobDetail"];
 
 /** SSE event payloads. */
 export interface ProgressEvent {
@@ -50,11 +39,7 @@ export interface FailedEvent {
 }
 
 /** Persisted timeline record (GET /research/{jobId}/events). */
-export interface JobEventRecord {
-  event: "submitted" | "progress" | "completed" | "failed" | string;
-  timestamp: string;
-  data: Record<string, unknown>;
-}
+export type JobEventRecord = Schemas["JobEvent"];
 
 /**
  * Thrown by the fetch helpers when the backend is reachable but returns a

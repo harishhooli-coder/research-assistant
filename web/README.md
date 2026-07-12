@@ -43,10 +43,22 @@ web/
 │   │   ├── theme-toggle.tsx
 │   │   └── ui/                        # shadcn/ui components
 │   └── lib/
-│       └── api.ts                     # Typed fetch helpers + API types
+│       ├── api.ts                     # Typed fetch helpers + API types
+│       └── api.generated.ts           # Generated from docs/api/openapi.json
 ├── .env.local.example
 └── vercel.json
 ```
+
+REST types in `api.ts` are generated from the FastAPI OpenAPI schema. After
+backend API changes, regenerate from the repo root:
+
+```powershell
+.\scripts\update-docs.ps1
+```
+
+Or from `web/`: `npm run docs:update`. Commit `docs/api/openapi.json` and
+`src/lib/api.generated.ts` when they change. CI enforces this via
+`.github/workflows/docs.yml`.
 
 ## Backend API contract
 

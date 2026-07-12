@@ -92,18 +92,25 @@ export async function mockResearchApi(
     jobId?: string;
     query?: string;
     initialStatus?: MockJobState["status"];
+    error?: string;
     streamProgress?: boolean;
+    failOnStream?: boolean;
     historyItems?: Array<{
       jobId: string;
       query: string;
       status: MockJobState["status"];
       createdAt?: string;
     }>;
+    historyError?: { status: number; message: string };
+    submitError?: { status: number; message: string };
+    jobNotFound?: boolean;
+    submitDelayMs?: number;
   } = {},
 ) {
   const jobId = options.jobId ?? TEST_JOB_ID;
   const query = options.query ?? TEST_QUERY;
   let status = options.initialStatus ?? "running";
+  const jobError = options.error ?? "Research pipeline failed.";
   const result = {
     markdown: "# Playwright E2E Result\n\nAutomated testing works.",
     sources: [
@@ -118,6 +125,19 @@ export async function mockResearchApi(
     const method = route.request().method();
 
     if (method === "POST") {
+      if (options.submitError) {
+        await route.fulfill({
+          status: options.submitError.status,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: options.submitError.message }),
+        });
+        return;
+      }
+      if (options.submitDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.submitDelayMs),
+        );
+      }
       await route.fulfill({
         status: 202,
         contentType: "application/json",
@@ -127,6 +147,14 @@ export async function mockResearchApi(
     }
 
     if (method === "GET") {
+      if (options.historyError) {
+        await route.fulfill({
+          status: options.historyError.status,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: options.historyError.message }),
+        });
+        return;
+      }
       const items =
         options.historyItems ??
         [
@@ -149,6 +177,14 @@ export async function mockResearchApi(
   });
 
   await page.route(apiPattern(`/research/${jobId}$`), async (route: Route) => {
+    if (options.jobNotFound) {
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Job not found." }),
+      });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -156,6 +192,7 @@ export async function mockResearchApi(
         jobDetail(jobId, query, {
           status,
           result: status === "done" ? result : undefined,
+          error: status === "failed" ? jobError : undefined,
         }),
       ),
     });
@@ -164,6 +201,14 @@ export async function mockResearchApi(
   await page.route(
     apiPattern(`/research/${jobId}/events`),
     async (route: Route) => {
+      if (options.jobNotFound) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ detail: "Job not found." }),
+        });
+        return;
+      }
       const events =
         status === "done"
           ? defaultEvents
@@ -176,7 +221,16 @@ export async function mockResearchApi(
     },
   );
 
-  if (options.streamProgress !== false) {
+  if (options.jobNotFound) {
+    await page.route(
+      apiPattern(`/research/${jobId}/stream`),
+      async (route: Route) => {
+        await route.abort("failed");
+      },
+    );
+  }
+
+  if (options.streamProgress !== false && !options.jobNotFound) {
     await page.route(
       apiPattern(`/research/${jobId}/stream`),
       async (route: Route) => {
@@ -187,6 +241,23 @@ export async function mockResearchApi(
             body: [
               `event: completed\n`,
               `data: ${JSON.stringify(result)}\n\n`,
+            ].join(""),
+          });
+          return;
+        }
+
+        if (status === "failed" || options.failOnStream) {
+          const failedMessage = jobError;
+          status = "failed";
+          await route.fulfill({
+            status: 200,
+            contentType: "text/event-stream",
+            body: [
+              `event: failed\n`,
+              `data: ${JSON.stringify({
+                error: failedMessage,
+                timestamp: LATER,
+              })}\n\n`,
             ].join(""),
           });
           return;

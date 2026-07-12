@@ -104,7 +104,7 @@ export default function ResearchPage() {
       setJobMeta(job);
       setStatus(job.status);
       if (job.status === "done") {
-        setResult(job.result);
+        setResult(job.result ?? null);
         setPct(100);
         if (job.updatedAt) {
           pushEvents([
@@ -316,7 +316,7 @@ export default function ResearchPage() {
 
         if (job.status === "done") {
           settledRef.current = true;
-          setResult(job.result);
+          setResult(job.result ?? null);
           setPct(100);
           setConnection("closed");
         } else if (job.status === "failed") {

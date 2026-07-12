@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "generate:api-types": "openapi-typescript ../docs/api/openapi.json -o src/lib/api.generated.ts",
+    "docs:check": "cd .. && python scripts/check_docs.py",
+    "docs:update": "cd .. && python scripts/update_docs.py",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
@@ -34,6 +37,8 @@
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
+    "@clerk/backend": "^3.11.4",
+    "@clerk/testing": "^2.2.7",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -41,6 +46,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vercel": "^44.2.7"

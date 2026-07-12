@@ -51,7 +51,7 @@ if (-not $envVars["NVIDIA_API_KEY"] -or $envVars["NVIDIA_API_KEY"].EndsWith("...
     throw "Set a real NVIDIA_API_KEY in $EnvFile before deploying."
 }
 if (-not $envVars["TAVILY_API_KEY"] -or $envVars["TAVILY_API_KEY"].Length -lt 20) {
-    Write-Warning "TAVILY_API_KEY looks incomplete — web search will fail until you update Fly secrets."
+    Write-Warning "TAVILY_API_KEY looks incomplete - web search will fail until you update Fly secrets."
 }
 
 Write-Host "==> Creating Fly apps (if needed)..."

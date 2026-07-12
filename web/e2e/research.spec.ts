@@ -45,8 +45,31 @@ test.describe("Research job page", () => {
     await mockResearchApi(page, { initialStatus: "done" });
     await page.goto(`/research/${TEST_JOB_ID}`);
 
-    await page.getByRole("link", { name: "New research" }).click();
+    await page.getByRole("button", { name: "New research" }).click();
     await expect(page).toHaveURL("/");
     await expect(page.getByLabel("Research query")).toBeVisible();
+  });
+
+  test("renders sources with external links on completion", async ({ page }) => {
+    await mockResearchApi(page, { initialStatus: "done" });
+    await page.goto(`/research/${TEST_JOB_ID}`);
+
+    await expect(
+      page.getByText("Research complete — report ready below"),
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-slot="card-title"]').filter({ hasText: "Sources" }),
+    ).toBeVisible();
+    const sourceLink = page.getByRole("link", { name: /Playwright docs/i });
+    await expect(sourceLink).toHaveAttribute("href", "https://playwright.dev/docs/intro");
+    await expect(sourceLink).toHaveAttribute("target", "_blank");
+  });
+
+  test("shows progress bar while job is running", async ({ page }) => {
+    await mockResearchApi(page, { initialStatus: "running" });
+    await page.goto(`/research/${TEST_JOB_ID}`);
+
+    await expect(page.getByText(/complete|Starting agents/i)).toBeVisible();
+    await expect(page.getByText("Live", { exact: true })).toBeVisible();
   });
 });

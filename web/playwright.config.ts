@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+process.loadEnvFile(".env.local");
+
 const PORT = process.env.PLAYWRIGHT_PORT ?? "3000";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
 
@@ -19,8 +21,23 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "global setup",
+      testMatch: /global\.setup\.ts/,
+    },
+    {
       name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "playwright/.clerk/user.json",
+      },
+      dependencies: ["global setup"],
+      testIgnore: /auth\.spec\.ts/,
+    },
+    {
+      name: "chromium-unauth",
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["global setup"],
+      testMatch: /auth\.spec\.ts/,
     },
   ],
   webServer: {

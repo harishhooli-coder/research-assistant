@@ -17,21 +17,31 @@ class EnqueueResponse(BaseModel):
     jobId: str
 
 
+class ResearchSource(BaseModel):
+    title: str
+    url: str
+
+
+class ResearchResultPayload(BaseModel):
+    markdown: str
+    sources: list[ResearchSource] = Field(default_factory=list)
+
+
 class JobSummary(BaseModel):
     jobId: str
     query: str
     status: Status
-    createdAt: Optional[str] = None
+    createdAt: str
 
 
 class JobDetail(BaseModel):
     jobId: str
     query: str
     status: Status
-    result: Optional[Any] = None
+    result: Optional[ResearchResultPayload] = None
     error: Optional[str] = None
-    createdAt: Optional[str] = None
-    updatedAt: Optional[str] = None
+    createdAt: str
+    updatedAt: str
 
 
 class JobEvent(BaseModel):

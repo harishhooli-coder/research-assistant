@@ -6,11 +6,11 @@ three ways:
 - a **Telegram bot** (Phase 1) with **Redis episodic memory** (Phase 2),
 - a **FastAPI** backend with an **arq** job queue, **Redis pub/sub → SSE** live
   progress, and **Postgres (Neon)** persistence (Phase 3),
-- ready for a Next.js web UI (Phase 4, owned by a separate frontend) that
-  consumes the exact API contract below.
+- ready for a Next.js web UI (Phase 4) that consumes the exact API contract below.
 
-> This repository is the **Python backend**. The `web/` Next.js frontend is
-> owned by a separate agent and is intentionally **not** included here.
+> This repository includes both the **Python backend** and the **`web/` Next.js
+> frontend**. The HTTP contract is defined in FastAPI and kept in sync via the
+> [documentation pipeline](#documentation-pipeline).
 
 ## Architecture
 
@@ -33,9 +33,11 @@ Web UI ─GET /research/:id/stream (SSE)─▶ FastAPI ─subscribe─▶ Redis 
 | `api/` | FastAPI app (`api/main.py`), arq worker (`api/worker.py`), settings |
 | `db/` | SQLAlchemy 2.0 async models, session, CRUD, Alembic migrations |
 | `tests/` | Offline pytest suite (failure paths, memory, API, queue retry) |
-| `scripts/` | Manual demos (real-Redis memory demo, enqueue helper) |
+| `scripts/` | Manual demos, deploy helpers, and doc-generation scripts |
+| `web/` | Next.js frontend (Clerk auth, SSE progress, history) |
+| `docs/api/` | Generated OpenAPI schema (`openapi.json`) |
 | `fly/` | Fly.io deploy configs for `api`, `worker`, and self-hosted `redis` |
-| `settings.py` | Central env-driven config | 
+| `settings.py` | Central env-driven config |
 | `docker-compose.yml` | Local Redis (AOF) + Postgres |
 
 ## Quickstart
@@ -117,6 +119,34 @@ already terminal when you connect, the terminal event is sent immediately.
 ### CORS
 All origins are allowed in dev (`CORS_ALLOW_ORIGINS=*`). For prod set
 `CORS_ALLOW_ORIGINS=https://your-app.vercel.app` (comma-separated for multiple).
+
+## Documentation pipeline
+
+The FastAPI app is the **source of truth** for the HTTP contract. When you change
+`api/schemas.py` or route definitions in `api/main.py`, regenerate and commit
+the derived artifacts:
+
+```powershell
+# Windows
+.\scripts\update-docs.ps1
+
+# macOS / Linux
+python scripts/update_docs.py
+```
+
+This writes:
+
+| Output | Purpose |
+|--------|---------|
+| `docs/api/openapi.json` | Committed OpenAPI schema |
+| `web/src/lib/api.generated.ts` | TypeScript types for the web client |
+
+CI (`.github/workflows/docs.yml`) runs `python scripts/check_docs.py` on PRs that
+touch `api/`, `docs/`, or `web/src/lib/`. The job fails if generated files are
+out of date — run the update script and commit the diff.
+
+See `docs/api/README.md` for details. Interactive Swagger UI is at `/docs` when
+the API is running.
 
 ## Configuration (env)
 
