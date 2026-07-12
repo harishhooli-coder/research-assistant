@@ -143,7 +143,8 @@ This writes:
 
 CI (`.github/workflows/docs.yml`) runs `python scripts/check_docs.py` on PRs that
 touch `api/`, `docs/`, or `web/src/lib/`. The job fails if generated files are
-out of date — run the update script and commit the diff.
+missing, untracked, or out of date — run the update script and commit the diff.
+Backend unit tests run in CI via `.github/workflows/pytest.yml`.
 
 See `docs/api/README.md` for details. Interactive Swagger UI is at `/docs` when
 the API is running.
@@ -263,7 +264,10 @@ This creates `research-redis`, `research-api`, and `research-worker` on Fly,
 sets secrets from `.env`, deploys all three apps, and runs Alembic migrations.
 
 Or use GitHub Actions: add `FLY_API_TOKEN` to repo secrets, then run the
-**Deploy backend to Fly.io** workflow (or push to `master`).
+**Deploy backend to Fly.io** workflow (or push to `main`/`master`). The workflow
+deploys Redis → API → worker and runs `alembic upgrade head` after the API
+deploy. One-time app/volume/Postgres setup and secret injection stay in
+`.\scripts\deploy-fly.ps1`.
 
 Set Fly secrets manually if needed:
 

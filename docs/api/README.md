@@ -36,8 +36,9 @@ Commit `docs/api/openapi.json` and `web/src/lib/api.generated.ts` when they chan
 ## CI
 
 The [Docs workflow](../../.github/workflows/docs.yml) runs `scripts/check_docs.py` on
-pull requests and pushes that touch `api/`, `docs/`, or `web/src/lib/`. The job fails
-if generated files drift from the FastAPI schema.
+pull requests and pushes that touch `api/`, `docs/`, `web/src/lib/`, or the docs
+scripts. The job fails if generated files are missing, untracked, or drift from
+the FastAPI schema.
 
 ## Interactive docs
 
