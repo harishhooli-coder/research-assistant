@@ -1,21 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "services": {
-    "research-api": {
-      "root": ".",
-      "entrypoint": "index.py",
-      "installCommand": "pip install -r requirements.txt",
-      "functions": {
-        "index.py": {
-          "maxDuration": 60
-        }
-      }
-    },
-    "web": {
-      "root": "web",
-      "framework": "nextjs",
-      "buildCommand": "npm run build",
-      "installCommand": "npm install"
+  "installCommand": "pip install -r requirements.txt",
+  "functions": {
+    "index.py": {
+      "maxDuration": 60
     }
   }
 }

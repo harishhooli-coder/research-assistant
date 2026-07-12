@@ -1,4 +1,4 @@
-# Render Blueprint — deploy backend when Fly.io is unavailable.
+# Render Blueprint — deploy FastAPI API + arq worker.
 # https://render.com/docs/blueprint-spec
 #
 # 1. Push this repo to GitHub

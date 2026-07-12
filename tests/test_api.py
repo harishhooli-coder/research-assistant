@@ -113,3 +113,24 @@ async def test_stream_emits_failed_for_failed_job(client):
     assert resp.status_code == 200
     assert "event: failed" in resp.text
     assert "boom" in resp.text
+
+
+async def test_post_research_rejects_notify_email_without_agentmail(client, monkeypatch):
+    class _Settings:
+        agentmail_api_key_configured = False
+        cors_origins_list = ["*"]
+
+        def require_runtime_keys(self):
+            return None
+
+        def require_postgres_database(self):
+            return None
+
+    monkeypatch.setattr("api.main.get_settings", lambda: _Settings())
+
+    resp = await client.post(
+        "/research",
+        json={"query": "test", "notifyEmail": "you@example.com"},
+    )
+    assert resp.status_code == 503
+    assert "AgentMail" in resp.json()["detail"]

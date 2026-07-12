@@ -351,6 +351,18 @@
             "minLength": 1,
             "title": "Query",
             "description": "The research question"
+          },
+          "notifyEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notifyemail",
+            "description": "Optional email address. When set and AgentMail is configured, the finished research report is emailed to this address."
           }
         },
         "type": "object",

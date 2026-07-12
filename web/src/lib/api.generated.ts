@@ -155,6 +155,11 @@ export interface components {
              * @description The research question
              */
             query: string;
+            /**
+             * Notifyemail
+             * @description Optional email address. When set and AgentMail is configured, the finished research report is emailed to this address.
+             */
+            notifyEmail?: string | null;
         };
         /** ResearchResultPayload */
         ResearchResultPayload: {

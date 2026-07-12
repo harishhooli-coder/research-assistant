@@ -117,17 +117,18 @@ The UI is built exactly against this FastAPI contract (`{API}` =
 ## Deploying to Vercel
 
 This app deploys to Vercel as a standard Next.js project. The backend
-(FastAPI) is deployed separately on Fly.io.
+(FastAPI + arq worker) is deployed separately (typically Render via
+`render.yaml`).
 
 1. Import the repository in Vercel and set the **Root Directory** to `web/`
    (this is a monorepo; the Python backend lives outside `web/`).
-2. Vercel auto-detects Next.js (see `vercel.json`). No custom config needed.
+2. Vercel auto-detects Next.js. No custom config needed.
 3. **Set the environment variable** in Project → Settings → Environment
    Variables:
 
    | Name | Value | Environments |
    | --- | --- | --- |
-   | `NEXT_PUBLIC_API_URL` | `https://<your-fastapi-app>.fly.dev` | Production / Preview / Development |
+   | `NEXT_PUBLIC_API_URL` | `https://<your-api-host>` | Production / Preview / Development |
 
    Because it is a `NEXT_PUBLIC_*` variable it is inlined into the client
    bundle at build time — re-deploy after changing it.
@@ -138,12 +139,11 @@ This app deploys to Vercel as a standard Next.js project. The backend
   `https://<your-app>.vercel.app` and any preview/custom domains). Configure
   FastAPI's `CORSMiddleware` `allow_origins` accordingly. `EventSource`
   requests are subject to CORS just like `fetch`.
-- **SSE through the proxy:** the stream is consumed with the browser's native
-  `EventSource`. The browser connects **directly** to the Fly.io FastAPI URL
-  (no Vercel rewrite/proxy in between), so SSE works as long as the backend
-  emits `text/event-stream` and CORS allows the origin. Fly's edge drops idle
-  connections at ~60s, so the backend sends heartbeat comments (~every 25s) to
-  keep the stream alive; the UI also falls back to polling
-  `GET /research/{jobId}` if the stream errors.
+- **SSE:** the stream is consumed with the browser's native `EventSource`.
+  The browser connects **directly** to the FastAPI URL (no Vercel
+  rewrite/proxy in between), so SSE works as long as the backend emits
+  `text/event-stream` and CORS allows the origin. The backend sends heartbeat
+  comments (~every 25s) so idle proxies do not drop the stream; the UI also
+  falls back to polling `GET /research/{jobId}` if the stream errors.
 - **No deploy is performed by this repo** — set the env var and deploy via the
   Vercel dashboard or `vercel` CLI when credentials are available.

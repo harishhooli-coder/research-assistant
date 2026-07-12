@@ -16,6 +16,7 @@ _PLACEHOLDER_SUFFIX = "..."
 _MIN_ANTHROPIC_KEY_LEN = 30
 _MIN_NVIDIA_KEY_LEN = 30
 _MIN_TAVILY_KEY_LEN = 20
+_MIN_AGENTMAIL_KEY_LEN = 20
 
 
 class Settings(BaseSettings):
@@ -32,7 +33,9 @@ class Settings(BaseSettings):
     anthropic_model: str = Field(default="claude-sonnet-4-6", alias="ANTHROPIC_MODEL")
     nvidia_api_key: str = Field(default="", alias="NVIDIA_API_KEY")
     nvidia_model: str = Field(
-        default="meta/llama-3.3-70b-instruct",
+        # llama-3.3-70b frequently queues/times out on the public NIM endpoint;
+        # Nemotron Super is fast and reliable for tool-calling agent loops.
+        default="nvidia/llama-3.3-nemotron-super-49b-v1",
         alias="NVIDIA_MODEL",
     )
     nvidia_base_url: str = Field(
@@ -43,6 +46,10 @@ class Settings(BaseSettings):
 
     # --- Telegram ----------------------------------------------------------
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+
+    # --- AgentMail (optional email delivery of research results) -----------
+    agentmail_api_key: str = Field(default="", alias="AGENTMAIL_API_KEY")
+    agentmail_inbox_id: str = Field(default="", alias="AGENTMAIL_INBOX_ID")
 
     # --- Redis (arq queue + pub/sub + episodic memory) ---------------------
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
@@ -108,6 +115,12 @@ class Settings(BaseSettings):
     def tavily_api_key_configured(self) -> bool:
         return not self._looks_like_placeholder(
             self.tavily_api_key, min_len=_MIN_TAVILY_KEY_LEN
+        )
+
+    @property
+    def agentmail_api_key_configured(self) -> bool:
+        return not self._looks_like_placeholder(
+            self.agentmail_api_key, min_len=_MIN_AGENTMAIL_KEY_LEN
         )
 
     def missing_llm_keys(self) -> list[str]:

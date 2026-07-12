@@ -11,6 +11,13 @@ Status = Literal["queued", "running", "done", "failed"]
 
 class ResearchRequest(BaseModel):
     query: str = Field(..., min_length=1, description="The research question")
+    notifyEmail: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional email address. When set and AgentMail is configured, "
+            "the finished research report is emailed to this address."
+        ),
+    )
 
 
 class EnqueueResponse(BaseModel):
@@ -25,6 +32,7 @@ class ResearchSource(BaseModel):
 class ResearchResultPayload(BaseModel):
     markdown: str
     sources: list[ResearchSource] = Field(default_factory=list)
+    partial: bool = False
 
 
 class JobSummary(BaseModel):

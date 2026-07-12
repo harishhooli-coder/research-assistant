@@ -3,10 +3,10 @@
 # Prerequisites:
 #   - Vercel CLI: npm i -g vercel   (or use npx vercel)
 #   - vercel login (once)
-#   - Fly API already deployed
+#   - Backend API already deployed (e.g. Render)
 #
 # Usage:
-#   .\scripts\deploy-vercel.ps1 -ApiUrl https://research-api.fly.dev
+#   .\scripts\deploy-vercel.ps1 -ApiUrl https://research-api.onrender.com
 #   .\scripts\deploy-vercel.ps1   # reads NEXT_PUBLIC_API_URL from web/.env.local
 
 param(
@@ -88,5 +88,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Web UI deployed. Set CORS on Fly to your Vercel URL:"
-Write-Host "  fly secrets set CORS_ALLOW_ORIGINS=https://<your-vercel-domain> --config fly/api/fly.toml"
+Write-Host "Web UI deployed. Set CORS_ALLOW_ORIGINS on the API to your Vercel URL:"
+Write-Host "  CORS_ALLOW_ORIGINS=https://<your-vercel-domain>"

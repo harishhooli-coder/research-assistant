@@ -2,11 +2,12 @@
 
 API contract (also documented in the README):
 
-  POST   /research                  body {query}        -> 202 {jobId}
+  POST   /research                  body {query, notifyEmail?}  -> 202 {jobId}
   GET    /research                  -> [{jobId,query,status,createdAt}]  (recent first)
   GET    /research/{jobId}          -> {jobId,query,status,result,error,createdAt,updatedAt}
   GET    /research/{jobId}/stream   -> SSE: events `progress` | `completed` | `failed`
                                        + a comment heartbeat every ~25s
+                                       (optional AgentMail delivery when notifyEmail is set)
 """
 
 from __future__ import annotations
@@ -70,6 +71,16 @@ def create_app() -> FastAPI:
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+        notify_email = (body.notifyEmail or "").strip() or None
+        if notify_email and not get_settings().agentmail_api_key_configured:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Email delivery requested but AgentMail is not configured. "
+                    "Set AGENTMAIL_API_KEY in .env and restart the API/worker."
+                ),
+            )
+
         job_id = uuid.uuid4().hex
         async with session_scope() as session:
             await crud.create_job(session, job_id, body.query)
@@ -81,10 +92,16 @@ def create_app() -> FastAPI:
                 "phase": "queued",
                 "pct": 0,
                 "message": "Research query submitted and queued.",
+                **({"notifyEmail": notify_email} if notify_email else {}),
             },
         )
         await redis.enqueue_job(
-            RESEARCH_TASK, job_id, body.query, _job_id=job_id, _queue_name=QUEUE_NAME
+            RESEARCH_TASK,
+            job_id,
+            body.query,
+            notify_email,
+            _job_id=job_id,
+            _queue_name=QUEUE_NAME,
         )
         return EnqueueResponse(jobId=job_id)
 
@@ -171,7 +188,7 @@ def create_app() -> FastAPI:
                     pass
 
         # EventSourceResponse sends a `: ping` comment heartbeat every `ping`s,
-        # keeping the connection alive through Fly's 60s idle proxy cutoff.
+        # keeping idle proxies from closing long-lived SSE connections.
         return EventSourceResponse(event_generator(), ping=HEARTBEAT_SECONDS)
 
     return app

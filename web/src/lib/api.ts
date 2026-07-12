@@ -120,10 +120,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 /** POST /research -> 202 { jobId } */
-export async function submitResearch(query: string): Promise<{ jobId: string }> {
+export async function submitResearch(
+  query: string,
+  options?: { notifyEmail?: string },
+): Promise<{ jobId: string }> {
+  const body: { query: string; notifyEmail?: string } = { query };
+  const notifyEmail = options?.notifyEmail?.trim();
+  if (notifyEmail) {
+    body.notifyEmail = notifyEmail;
+  }
   return request<{ jobId: string }>("/research", {
     method: "POST",
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(body),
   });
 }
 

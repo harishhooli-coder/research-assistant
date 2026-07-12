@@ -1,5 +1,5 @@
 # Single image for both the FastAPI API and the arq worker.
-# The Fly worker app overrides the command via [processes].
+# Override the command per service (uvicorn vs arq) at deploy time.
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -20,5 +20,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Default: run the API. (The worker app overrides this with the arq command.)
+# Default: run the API. Worker services override with: arq api.worker.WorkerSettings
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -11,6 +11,11 @@ from langchain_core.language_models import BaseChatModel
 
 from settings import get_settings
 
+# Keep per-call latency bounded so a hung NIM model fails the job instead of
+# burning the full arq job_timeout across retries.
+_LLM_TIMEOUT_SECONDS = 45
+_LLM_MAX_RETRIES = 1
+
 
 def _build_anthropic(temperature: float) -> BaseChatModel:
     from langchain_anthropic import ChatAnthropic
@@ -19,8 +24,8 @@ def _build_anthropic(temperature: float) -> BaseChatModel:
     return ChatAnthropic(
         model=settings.anthropic_model,
         temperature=temperature,
-        timeout=60,
-        max_retries=2,
+        timeout=_LLM_TIMEOUT_SECONDS,
+        max_retries=_LLM_MAX_RETRIES,
         api_key=settings.anthropic_api_key or None,
     )
 
@@ -32,8 +37,8 @@ def _build_nvidia(temperature: float) -> BaseChatModel:
     return ChatOpenAI(
         model=settings.nvidia_model,
         temperature=temperature,
-        timeout=60,
-        max_retries=2,
+        timeout=_LLM_TIMEOUT_SECONDS,
+        max_retries=_LLM_MAX_RETRIES,
         api_key=settings.nvidia_api_key,
         base_url=settings.nvidia_base_url,
     )

@@ -79,9 +79,12 @@ def test_truncate_messages_keeps_system_and_recent_under_cap():
 
 
 def test_context_overflow_graph_completes(patch_models):
-    supervisor = FakeChatModel(responses=["EDIT"])  # skip research, go to editor
+    # Supervisor may try EDIT immediately; the graph overrides to RESEARCH until
+    # the researcher has produced output, so patch all three roles.
+    supervisor = FakeChatModel(responses=["EDIT"])
+    researcher = FakeChatModel(responses=["Findings under truncation."])
     editor = FakeChatModel(responses=["# Final answer"])
-    patch_models(supervisor=supervisor, editor=editor)
+    patch_models(supervisor=supervisor, researcher=researcher, editor=editor)
 
     from settings import get_settings
 
@@ -92,7 +95,7 @@ def test_context_overflow_graph_completes(patch_models):
 
     assert result["markdown"] == "# Final answer"  # completed, no overflow crash
     # Every prompt the models actually received stayed under the token cap.
-    for received in supervisor.received + editor.received:
+    for received in supervisor.received + researcher.received + editor.received:
         assert count_message_tokens(received) <= cap
 
 
@@ -111,3 +114,17 @@ def test_loop_limit_clean_exit(patch_models):
 
     assert result["partial"] is True  # we exited via the step-limit guard
     assert result["markdown"].strip()  # still produced a final answer
+
+
+def test_supervisor_forces_research_before_edit(patch_models):
+    """EDIT before any researcher output must be overridden to RESEARCH."""
+    patch_models(
+        supervisor=FakeChatModel(responses=["EDIT", "EDIT"]),
+        researcher=FakeChatModel(responses=["Found one useful source about X."]),
+        editor=FakeChatModel(responses=["# Answer\n\nBased on research."]),
+    )
+
+    result = run_research("tell me about X")
+
+    assert result["markdown"].startswith("# Answer")
+    assert result["partial"] is False

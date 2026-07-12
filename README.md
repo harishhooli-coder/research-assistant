@@ -31,12 +31,13 @@ Web UI ─GET /research/:id/stream (SSE)─▶ FastAPI ─subscribe─▶ Redis 
 | `bot/` | Telegram bot entrypoint (`python -m bot.main`) |
 | `memory/` | Redis episodic memory (last-3 searches via `LPUSH`+`LTRIM`) |
 | `api/` | FastAPI app (`api/main.py`), arq worker (`api/worker.py`), settings |
+| `mail/` | AgentMail client: optional email delivery of research results |
 | `db/` | SQLAlchemy 2.0 async models, session, CRUD, Alembic migrations |
 | `tests/` | Offline pytest suite (failure paths, memory, API, queue retry) |
 | `scripts/` | Manual demos, deploy helpers, and doc-generation scripts |
 | `web/` | Next.js frontend (Clerk auth, SSE progress, history) |
 | `docs/api/` | Generated OpenAPI schema (`openapi.json`) |
-| `fly/` | Fly.io deploy configs for `api`, `worker`, and self-hosted `redis` |
+| `render.yaml` | Render Blueprint for API + arq worker |
 | `settings.py` | Central env-driven config |
 | `docker-compose.yml` | Local Redis (AOF) + Postgres |
 
@@ -82,8 +83,12 @@ arq api.worker.WorkerSettings
 The frontend is built against this exact contract.
 
 ### `POST /research`
-Request body: `{ "query": string }`
+Request body: `{ "query": string, "notifyEmail"?: string }`
 Response: **202** `{ "jobId": string }` (returns immediately; work runs in the worker)
+
+When `notifyEmail` is set and `AGENTMAIL_API_KEY` is configured, the worker emails
+the finished markdown report via [AgentMail](https://docs.agentmail.to) after the
+job completes. Email failures are reported as progress events and do not fail the job.
 
 ### `GET /research`
 Response: `[{ "jobId", "query", "status", "createdAt" }]` — most recent first.
@@ -112,9 +117,9 @@ Response:
 | `completed` | the final result object `{ "markdown", "sources" }` |
 | `failed` | `{ "error" }` |
 
-A comment heartbeat (`: ping`) is sent every ~25s to survive Fly's 60s idle
-proxy cutoff. The stream closes after `completed`/`failed`. If the job is
-already terminal when you connect, the terminal event is sent immediately.
+A comment heartbeat (`: ping`) is sent every ~25s to keep proxies from closing
+idle SSE connections. The stream closes after `completed`/`failed`. If the job
+is already terminal when you connect, the terminal event is sent immediately.
 
 ### CORS
 All origins are allowed in dev (`CORS_ALLOW_ORIGINS=*`). For prod set
@@ -152,7 +157,8 @@ the API is running.
 ## Configuration (env)
 
 See `.env.example`. Key vars: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`,
-`TAVILY_API_KEY`, `TELEGRAM_BOT_TOKEN`, `REDIS_URL`, `DATABASE_URL`,
+`TAVILY_API_KEY`, `TELEGRAM_BOT_TOKEN`, `AGENTMAIL_API_KEY` (optional email
+delivery), `AGENTMAIL_INBOX_ID` (optional), `REDIS_URL`, `DATABASE_URL`,
 `CORS_ALLOW_ORIGINS`, and agent limits (`MAX_SUPERVISOR_STEPS`,
 `MAX_CONTEXT_TOKENS`, `MAX_FETCH_CHARS`).
 
@@ -230,93 +236,42 @@ Why it works: jobs are idempotent (keyed by `jobId`, upserted in Postgres). A
 worker killed mid-job never acks the job, so arq re-queues it; in-process
 exceptions retry with exponential backoff up to `max_tries`.
 
-## Fly.io + Vercel deploy (production)
+## Render + Vercel deploy (production)
 
-**Architecture:** Vercel hosts the Next.js UI (`web/`); Fly.io hosts the API,
-worker, Redis, and Postgres.
+**Architecture:** Vercel hosts the Next.js UI (`web/`); Render hosts the FastAPI
+API and arq worker. Use Neon for Postgres and Upstash (or Render Redis) for
+`REDIS_URL`.
 
 ### One-time setup
 
-1. **Fly.io** — create an account at https://fly.io and install the CLI:
-   ```powershell
-   .\scripts\install-flyctl.ps1
-   .\.tools\flyctl.exe auth login
-   ```
-
-2. **Secrets in `.env`** — fill in real keys (never commit `.env`):
+1. **Secrets in `.env`** — fill in real keys (never commit `.env`):
    - `NVIDIA_API_KEY` (or `ANTHROPIC_API_KEY`)
    - `TAVILY_API_KEY` (required for web search)
    - `LLM_PROVIDER=nvidia`
+   - `DATABASE_URL` (Neon)
+   - `REDIS_URL` (Upstash or Render Redis — not localhost)
 
-3. **Vercel** — link https://github.com/harishhooli-coder/research-assistant
-   - Root Directory: `web`
-   - Env var: `NEXT_PUBLIC_API_URL=https://research-api.fly.dev`
+2. **Render** — Dashboard → New → Blueprint → connect this repo (`render.yaml`).
+   Set secret env vars on both `research-api` and `research-worker`:
+   `DATABASE_URL`, `REDIS_URL`, `NVIDIA_API_KEY`, `TAVILY_API_KEY`, and
+   `CORS_ALLOW_ORIGINS` (your Vercel origin) on the API service.
 
-### Deploy backend (Fly.io)
+3. **Migrations** — once against Neon:
+   ```bash
+   DATABASE_URL='postgresql+asyncpg://...' alembic upgrade head
+   ```
 
-From the repo root:
-
-```powershell
-.\scripts\deploy-fly.ps1
-```
-
-This creates `research-redis`, `research-api`, and `research-worker` on Fly,
-sets secrets from `.env`, deploys all three apps, and runs Alembic migrations.
-
-Or use GitHub Actions: add `FLY_API_TOKEN` to repo secrets, then run the
-**Deploy backend to Fly.io** workflow (or push to `main`/`master`). The workflow
-deploys Redis → API → worker and runs `alembic upgrade head` after the API
-deploy. One-time app/volume/Postgres setup and secret injection stay in
-`.\scripts\deploy-fly.ps1`.
-
-Set Fly secrets manually if needed:
-
-```powershell
-.\.tools\flyctl.exe secrets set LLM_PROVIDER=nvidia `
-  NVIDIA_API_KEY=... NVIDIA_MODEL=meta/llama-3.3-70b-instruct `
-  TAVILY_API_KEY=... REDIS_URL=redis://research-redis.internal:6379 `
-  CORS_ALLOW_ORIGINS=https://your-app.vercel.app --config fly/api/fly.toml
-```
+4. **Vercel** — Root Directory: `web`
+   - Env var: `NEXT_PUBLIC_API_URL=https://<your-render-api>.onrender.com`
 
 ### Deploy frontend (Vercel)
 
 After the API is live:
 
 ```powershell
-.\scripts\deploy-vercel.ps1 -ApiUrl https://research-api.fly.dev
+.\scripts\deploy-vercel.ps1 -ApiUrl https://<your-render-api>.onrender.com
 ```
 
-Then update CORS on Fly to match your Vercel URL.
-
-## Fly.io deploy (configs only — manual reference)
-
-Three apps under `fly/`: `api` (public HTTP/SSE), `worker` (no public service),
-and a self-hosted `redis` (persistent volume). Postgres via Fly Postgres or Neon.
-
-```bash
-# 1) Redis (stateful, private-only at research-redis.internal:6379)
-cd fly/redis
-fly apps create research-redis
-fly volumes create redis_data --region iad --size 1
-fly deploy
-cd ../..
-
-# 2) API (run from repo root so the build context includes the code)
-fly apps create research-api
-fly secrets set LLM_PROVIDER=nvidia NVIDIA_API_KEY=... TAVILY_API_KEY=... \
-  REDIS_URL=redis://research-redis.internal:6379 \
-  DATABASE_URL='postgresql+asyncpg://USER:PASS@HOST/db?ssl=require' \
-  CORS_ALLOW_ORIGINS=https://your-app.vercel.app --config fly/api/fly.toml
-fly deploy --config fly/api/fly.toml --dockerfile Dockerfile
-
-# 3) Worker (always-on, no public service)
-fly apps create research-worker
-fly secrets set LLM_PROVIDER=nvidia NVIDIA_API_KEY=... TAVILY_API_KEY=... \
-  REDIS_URL=redis://research-redis.internal:6379 \
-  DATABASE_URL='postgresql+asyncpg://USER:PASS@HOST/db?ssl=require' \
-  --config fly/worker/fly.toml
-fly deploy --config fly/worker/fly.toml --dockerfile Dockerfile
-```
-Run Alembic against Neon once (`DATABASE_URL=... alembic upgrade head`) before
-first use. The web UI's `NEXT_PUBLIC_API_URL` should point at the deployed
-`research-api` URL; SSE works through Fly's proxy thanks to the 25s heartbeat.
+Then set `CORS_ALLOW_ORIGINS` on Render to your Vercel URL. Alternatively,
+`.\scripts\deploy-vercel-app.ps1` can deploy API + web to Vercel (worker still
+needs Render or a local process).

@@ -41,16 +41,28 @@ def _friendly_error(exc: Exception) -> str:
             "NVIDIA API key is missing or invalid. Set NVIDIA_API_KEY in .env "
             "(https://build.nvidia.com) and restart the worker."
         )
+    if "timeout" in lower or "timed out" in lower:
+        return (
+            "LLM request timed out. The configured NVIDIA model may be overloaded "
+            "or unavailable. Prefer NVIDIA_MODEL=nvidia/llama-3.3-nemotron-super-49b-v1 "
+            "(or meta/llama-3.1-70b-instruct), then restart the worker."
+        )
     return msg[:1000]
 
 
-async def run_research_job(ctx: dict, job_id: str, query: str) -> dict:
+async def run_research_job(
+    ctx: dict,
+    job_id: str,
+    query: str,
+    notify_email: str | None = None,
+) -> dict:
     """Execute the research graph for a queued job."""
     from agent.graph import run_research  # imported lazily to keep worker boot light
 
     redis = ctx["redis"]
     job_try = ctx.get("job_try", 1)
     loop = asyncio.get_running_loop()
+    notify_email = (notify_email or "").strip() or None
 
     async with session_scope() as session:
         await crud.mark_running(session, job_id)
@@ -87,8 +99,69 @@ async def run_research_job(ctx: dict, job_id: str, query: str) -> dict:
 
     async with session_scope() as session:
         await crud.mark_done(session, job_id, result)
+
+    if notify_email:
+        await _email_research_result(
+            redis, job_id=job_id, query=query, notify_email=notify_email, result=result
+        )
+
     await publish_event(redis, job_id, "completed", result)
     return result
+
+
+async def _email_research_result(
+    redis,
+    *,
+    job_id: str,
+    query: str,
+    notify_email: str,
+    result: dict,
+) -> None:
+    """Best-effort AgentMail delivery; never fails the research job itself."""
+    from mail.client import send_research_result
+
+    await publish_event(
+        redis,
+        job_id,
+        "progress",
+        {
+            "phase": "email",
+            "pct": 95,
+            "message": f"Emailing results to {notify_email}.",
+        },
+    )
+    try:
+        meta = await asyncio.to_thread(
+            send_research_result,
+            to=notify_email,
+            query=query,
+            job_id=job_id,
+            markdown=result.get("markdown") or "",
+            sources=result.get("sources") or [],
+        )
+        await publish_event(
+            redis,
+            job_id,
+            "progress",
+            {
+                "phase": "email",
+                "pct": 98,
+                "message": "Research results emailed.",
+                "messageId": meta.get("message_id"),
+            },
+        )
+    except Exception as exc:
+        logger.exception("AgentMail delivery failed for job %s", job_id)
+        await publish_event(
+            redis,
+            job_id,
+            "progress",
+            {
+                "phase": "email",
+                "pct": 98,
+                "message": f"Email delivery failed: {str(exc)[:200]}",
+            },
+        )
 
 
 async def on_startup(ctx: dict) -> None:

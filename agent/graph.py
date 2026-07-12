@@ -11,9 +11,10 @@ precise control over the three required failure paths:
 
 from __future__ import annotations
 
+import logging
 from typing import Callable, Literal, Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
 
@@ -27,6 +28,8 @@ from agent.tools import (
 from agent.truncate import truncate_messages
 from settings import get_settings
 
+logger = logging.getLogger(__name__)
+
 ProgressCB = Optional[Callable[[str, int, str], None]]
 
 SUPERVISOR_PROMPT = """You are the supervisor of a research team. Decide the next step.
@@ -35,19 +38,30 @@ Reply with EXACTLY ONE WORD:
 - RESEARCH  - if more web research/sources are needed to answer the user.
 - EDIT      - if enough information has been gathered to write the final answer.
 
-Consider the conversation so far. Prefer EDIT once you have at least one useful
-source or after research has been attempted. Do not output anything else."""
+Rules:
+- If there is no [researcher] summary yet, you MUST reply RESEARCH.
+- Prefer EDIT once at least one [researcher] summary (with sources) exists.
+- Do not output anything else."""
 
-RESEARCHER_PROMPT = """You are a research agent. Use the web_search tool to find
-relevant sources for the user's question, and fetch_url to read promising pages.
-If a tool reports 'source unavailable', try a different query or source, or
-proceed with what you have. Summarise the key findings with their sources."""
+RESEARCHER_PROMPT = """You are a research agent. You MUST call the web_search tool
+at least once to find relevant sources for the user's question. Use fetch_url to
+read promising pages. If a tool reports 'source unavailable', try a different
+query or source, or proceed with what you have. Summarise the key findings with
+their sources. Do not invent sources."""
 
 EDITOR_PROMPT = """You are an expert editor. Using the research in the conversation,
 write a clear, well-structured **markdown** answer to the user's original
 question. Include a short '## Sources' section listing the sources used. If some
 sources were unavailable or the research was incomplete, say so briefly and
-answer with what is available. Be concise and factual."""
+answer with what is available. Be concise and factual. Do not invent URLs."""
+
+
+def _has_researcher_output(state: AgentState) -> bool:
+    for m in state.get("messages", []):
+        if isinstance(m, AIMessage) and isinstance(m.content, str):
+            if m.content.startswith("[researcher]"):
+                return True
+    return bool(state.get("sources"))
 
 
 def _supervisor_node_factory(progress_cb: ProgressCB):
@@ -78,6 +92,10 @@ def _supervisor_node_factory(progress_cb: ProgressCB):
         if progress_cb:
             progress_cb("supervisor", min(20 + step * 10, 70), f"Planning step {step}.")
 
+        # Deterministic first pass: always gather sources before allowing EDIT.
+        if not _has_researcher_output(state):
+            return {"step_count": step, "next": "researcher"}
+
         messages = state.get("messages", [])
         model = llm.get_supervisor_model()
         prompt = [SystemMessage(content=SUPERVISOR_PROMPT), *messages]
@@ -88,6 +106,12 @@ def _supervisor_node_factory(progress_cb: ProgressCB):
         )
         resp = model.invoke(prompt)
         decision = _parse_decision(resp.content)
+
+        # Safety net if the model still tries to finalize too early.
+        if decision == "editor" and not _has_researcher_output(state):
+            logger.info("supervisor overrode EDIT->RESEARCH (no researcher output yet)")
+            decision = "researcher"
+
         return {"step_count": step, "next": decision}
 
     return supervisor
@@ -95,8 +119,19 @@ def _supervisor_node_factory(progress_cb: ProgressCB):
 
 def _parse_decision(content) -> str:
     text = content if isinstance(content, str) else str(content)
-    upper = text.strip().upper()
-    if "RESEARCH" in upper:
+    upper = " ".join(text.strip().upper().split())
+    if not upper:
+        return "editor"
+
+    first = upper.split(" ", 1)[0]
+    if first in {"RESEARCH", "RESEARCHER"}:
+        return "researcher"
+    if first in {"EDIT", "EDITOR"}:
+        return "editor"
+
+    if "RESEARCH" in upper and not any(
+        neg in upper for neg in ("DO NOT RESEARCH", "NO RESEARCH", "SKIP RESEARCH")
+    ):
         return "researcher"
     return "editor"
 
@@ -119,14 +154,17 @@ def _researcher_node_factory(progress_cb: ProgressCB):
             max_chars_per_message=settings.max_fetch_chars,
         )
 
-        result = react_agent.invoke({"messages": trimmed})
+        result = react_agent.invoke(
+            {"messages": trimmed},
+            config={"recursion_limit": 12},
+        )
         new_messages = result.get("messages", [])
 
         # Collect sources from any web_search tool outputs produced this turn.
         sources = list(state.get("sources", []))
         seen = {s.get("url") for s in sources}
         for m in new_messages:
-            if m.__class__.__name__ == "ToolMessage":
+            if isinstance(m, ToolMessage):
                 for src in parse_sources_from_tool_output(str(m.content)):
                     if src["url"] not in seen:
                         sources.append(src)
@@ -242,6 +280,7 @@ def run_research(
 
     Returns ``{"markdown": str, "sources": [{"title","url"}], "partial": bool}``.
     """
+    del session_id  # reserved for future episodic-memory wiring on the API path
     if progress_cb:
         progress_cb("queued", 5, "Starting research.")
 
