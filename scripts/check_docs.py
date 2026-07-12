@@ -1,7 +1,7 @@
 """Verify generated API documentation matches the FastAPI source of truth.
 
 Regenerates docs/api/openapi.json and web/src/lib/api.generated.ts, then exits
-non-zero when committed artifacts are out of date.
+non-zero when committed artifacts are missing, untracked, or out of date.
 """
 
 from __future__ import annotations
@@ -14,6 +14,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OPENAPI = REPO_ROOT / "docs" / "api" / "openapi.json"
 GENERATED_TS = REPO_ROOT / "web" / "src" / "lib" / "api.generated.ts"
+ARTIFACT_PATHS = (
+    "docs/api/openapi.json",
+    "web/src/lib/api.generated.ts",
+)
+
+_STALE_MSG = (
+    "\nGenerated documentation is out of date.\n"
+    "Run:  python scripts/update_docs.py\n"
+    "Then commit the updated files."
+)
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> None:
@@ -41,17 +51,24 @@ def main() -> int:
         print(f"Missing {GENERATED_TS.relative_to(REPO_ROOT)}", file=sys.stderr)
         return 1
 
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--", *ARTIFACT_PATHS],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    if status.stdout.strip():
+        print(status.stdout, end="")
+        print(_STALE_MSG, file=sys.stderr)
+        return 1
+
     diff = subprocess.run(
-        ["git", "diff", "--exit-code", "--", "docs/api/openapi.json", "web/src/lib/api.generated.ts"],
+        ["git", "diff", "--exit-code", "--", *ARTIFACT_PATHS],
         cwd=REPO_ROOT,
     )
     if diff.returncode != 0:
-        print(
-            "\nGenerated documentation is out of date.\n"
-            "Run:  python scripts/update_docs.py\n"
-            "Then commit the updated files.",
-            file=sys.stderr,
-        )
+        print(_STALE_MSG, file=sys.stderr)
         return 1
 
     print("Documentation artifacts are up to date.")

@@ -66,10 +66,14 @@ test.describe("Research job page", () => {
   });
 
   test("shows progress bar while job is running", async ({ page }) => {
-    await mockResearchApi(page, { initialStatus: "running" });
+    await mockResearchApi(page, {
+      initialStatus: "running",
+      freezeStream: true,
+    });
     await page.goto(`/research/${TEST_JOB_ID}`);
 
-    await expect(page.getByText(/complete|Starting agents/i)).toBeVisible();
-    await expect(page.getByText("Live", { exact: true })).toBeVisible();
+    await expect(page.getByText("Starting agents…")).toBeVisible();
+    await expect(page.getByText("30% complete")).toBeVisible();
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
   });
 });

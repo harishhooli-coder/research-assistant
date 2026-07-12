@@ -54,7 +54,9 @@ test.describe("Error handling", () => {
     });
     await page.goto(`/research/${TEST_JOB_ID}`);
 
-    await expect(page.getByText("Worker crashed unexpectedly.")).toBeVisible({
+    await expect(
+      page.getByText("Worker crashed unexpectedly.").last(),
+    ).toBeVisible({
       timeout: 15_000,
     });
     await expect(

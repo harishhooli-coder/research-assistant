@@ -105,6 +105,7 @@ export async function mockResearchApi(
     submitError?: { status: number; message: string };
     jobNotFound?: boolean;
     submitDelayMs?: number;
+    freezeStream?: boolean;
   } = {},
 ) {
   const jobId = options.jobId ?? TEST_JOB_ID;
@@ -256,6 +257,23 @@ export async function mockResearchApi(
               `event: failed\n`,
               `data: ${JSON.stringify({
                 error: failedMessage,
+                timestamp: LATER,
+              })}\n\n`,
+            ].join(""),
+          });
+          return;
+        }
+
+        if (options.freezeStream) {
+          await route.fulfill({
+            status: 200,
+            contentType: "text/event-stream",
+            body: [
+              `event: progress\n`,
+              `data: ${JSON.stringify({
+                phase: "supervisor",
+                pct: 30,
+                message: "Planning research steps.",
                 timestamp: LATER,
               })}\n\n`,
             ].join(""),

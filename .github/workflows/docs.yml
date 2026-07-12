@@ -6,25 +6,25 @@ on:
     paths:
       - "api/**"
       - "docs/**"
-      - "web/src/lib/api.ts"
-      - "web/src/lib/api.generated.ts"
+      - "web/src/lib/**"
       - "web/package.json"
       - "web/package-lock.json"
       - "scripts/export_openapi.py"
       - "scripts/check_docs.py"
       - "scripts/update_docs.py"
+      - "scripts/update-docs.ps1"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "api/**"
       - "docs/**"
-      - "web/src/lib/api.ts"
-      - "web/src/lib/api.generated.ts"
+      - "web/src/lib/**"
       - "web/package.json"
       - "web/package-lock.json"
       - "scripts/export_openapi.py"
       - "scripts/check_docs.py"
       - "scripts/update_docs.py"
+      - "scripts/update-docs.ps1"
       - ".github/workflows/docs.yml"
 
 jobs:
