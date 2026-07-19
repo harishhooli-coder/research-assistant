@@ -1,6 +1,11 @@
+import { setupClerkTestingToken } from "@clerk/testing/playwright";
 import { expect, test } from "@playwright/test";
 
 test.describe("Authentication", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupClerkTestingToken({ page });
+  });
+
   test("redirects unauthenticated users to sign-in", async ({ page }) => {
     await page.goto("/");
 

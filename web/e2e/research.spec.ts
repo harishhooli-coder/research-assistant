@@ -72,8 +72,10 @@ test.describe("Research job page", () => {
     });
     await page.goto(`/research/${TEST_JOB_ID}`);
 
-    await expect(page.getByText("Starting agents…")).toBeVisible();
+    // freezeStream emits a 30% progress event, so the UI shows pct text
+    // rather than the zero-progress "Starting agents…" placeholder.
     await expect(page.getByText("30% complete")).toBeVisible();
     await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    await expect(page.getByText("Planning research steps.")).toBeVisible();
   });
 });

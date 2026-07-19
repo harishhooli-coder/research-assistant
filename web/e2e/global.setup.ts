@@ -1,4 +1,4 @@
-import { clerk, clerkSetup } from "@clerk/testing/playwright";
+import { clerk, clerkSetup, setupClerkTestingToken } from "@clerk/testing/playwright";
 import { createClerkClient } from "@clerk/backend";
 import { test as setup } from "@playwright/test";
 import fs from "fs";
@@ -48,7 +48,9 @@ setup("global setup", async () => {
 });
 
 setup("authenticate", async ({ page }) => {
-  await page.goto("/");
+  // Public page that loads Clerk — required before clerk.signIn().
+  await page.goto("/sign-in");
+  await setupClerkTestingToken({ page });
   await clerk.signIn({
     page,
     emailAddress: E2E_EMAIL,
@@ -57,7 +59,7 @@ setup("authenticate", async ({ page }) => {
   await page.goto("/");
   await page
     .getByRole("heading", { name: "Ask anything. Get a sourced answer." })
-    .waitFor();
+    .waitFor({ timeout: 30_000 });
 
   await page.context().storageState({ path: authFile });
 });
